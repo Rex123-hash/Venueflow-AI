@@ -1,0 +1,212 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  FAN
+  STAFF
+  MANAGER
+  ADMIN
+}
+
+enum EventStatus {
+  UPCOMING
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum DensityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum GateStatus {
+  OPEN
+  CLOSED
+  LIMITED
+}
+
+enum TicketStatus {
+  ACTIVE
+  USED
+  CANCELLED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String?
+  role         Role      @default(FAN)
+  googleId     String?   @unique
+  avatarUrl    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  tickets      Ticket[]
+  incidents    Incident[]
+}
+
+model Venue {
+  id        String   @id @default(uuid())
+  name      String
+  city      String
+  address   String
+  capacity  Int
+  mapConfig Json
+  lat       Float
+  lng       Float
+  imageUrl  String?
+  events    Event[]
+}
+
+model Event {
+  id               String              @id @default(uuid())
+  venueId          String
+  venue            Venue               @relation(fields: [venueId], references: [id])
+  name             String
+  description      String
+  date             DateTime
+  startTime        DateTime
+  endTime          DateTime
+  bannerUrl        String?
+  status           EventStatus         @default(UPCOMING)
+  emergencyActive  Boolean             @default(false)
+  simulationPhase  String              @default("GATES_OPEN")
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  zones            Zone[]
+  gates            Gate[]
+  alerts           Alert[]
+  tickets          Ticket[]
+  crowdSnapshots   CrowdSnapshot[]
+  aiRecommendations AiRecommendation[]
+  incidents        Incident[]
+}
+
+model Zone {
+  id               String         @id @default(uuid())
+  eventId          String
+  event            Event          @relation(fields: [eventId], references: [id])
+  name             String
+  label            String
+  maxCapacity      Int
+  currentCount     Int            @default(0)
+  densityLevel     DensityLevel   @default(LOW)
+  evacuationActive Boolean        @default(false)
+  exitPaths        Json?
+  lat              Float
+  lng              Float
+  polygonCoords    Json
+  zoneType         String         @default("GENERAL") // ENTRY, STAND, FOOD, VIP
+  adjacentZoneIds  Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  snapshots        CrowdSnapshot[]
+}
+
+model Gate {
+  id                 String     @id @default(uuid())
+  eventId            String
+  event              Event      @relation(fields: [eventId], references: [id])
+  name               String
+  label              String
+  zoneId             String
+  status             GateStatus @default(OPEN)
+  currentQueueCount  Int        @default(0)
+  avgWaitMinutes     Float      @default(0)
+  throughputPerMinute Int       @default(0)
+  staffCount         Int        @default(0)
+  isVip              Boolean    @default(false)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model Ticket {
+  id           String       @id @default(uuid())
+  eventId      String
+  event        Event        @relation(fields: [eventId], references: [id])
+  userId       String
+  user         User         @relation(fields: [userId], references: [id])
+  seatNumber   String
+  gateAssigned String
+  standAssigned String
+  qrCode       String       @unique
+  status       TicketStatus @default(ACTIVE)
+  scannedAt    DateTime?
+  createdAt    DateTime     @default(now())
+}
+
+model Alert {
+  id          String        @id @default(uuid())
+  eventId     String
+  event       Event         @relation(fields: [eventId], references: [id])
+  zoneId      String?
+  zoneName    String?
+  severity    AlertSeverity
+  message     String
+  aiGenerated Boolean       @default(false)
+  resolved    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  resolvedAt  DateTime?
+}
+
+model CrowdSnapshot {
+  id           String       @id @default(uuid())
+  zoneId       String
+  zone         Zone         @relation(fields: [zoneId], references: [id])
+  eventId      String
+  event        Event        @relation(fields: [eventId], references: [id])
+  count        Int
+  densityLevel DensityLevel
+  recordedAt   DateTime     @default(now())
+
+  @@index([zoneId, recordedAt])
+  @@index([eventId, recordedAt])
+}
+
+model AiRecommendation {
+  id              String   @id @default(uuid())
+  eventId         String
+  event           Event    @relation(fields: [eventId], references: [id])
+  generatedAt     DateTime @default(now())
+  recommendations Json
+  actedOn         Boolean  @default(false)
+}
+
+model Incident {
+  id           String         @id @default(uuid())
+  eventId      String
+  event        Event          @relation(fields: [eventId], references: [id])
+  zoneId       String?
+  reportedById String
+  reportedBy   User           @relation(fields: [reportedById], references: [id])
+  category     String
+  description  String
+  photoUrl     String?
+  status       IncidentStatus @default(OPEN)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
