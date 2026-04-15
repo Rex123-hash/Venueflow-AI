@@ -120,13 +120,50 @@ The platform has three AI personas powered by **Google Cloud Vertex AI**:
 - **Helmet + CORS** — security hardening
 
 ### Google Cloud Services ☁️
-| Service | Usage |
-|---------|-------|
-| **Vertex AI** (`@google-cloud/vertexai`) | Powers FlowBot, FlowAgent, Emergency AI via `gemini-2.0-flash-001` with ADC |
-| **Google OAuth 2.0** (`passport-google-oauth20`) | One-click "Continue with Google" sign-in |
-| **Cloud Run** | Containerized, auto-scaling serverless deployment |
-| **Cloud Build** | CI/CD via `gcloud run deploy --source` |
-| **Artifact Registry** | Docker image storage |
+
+> All Google integrations are centralized in **`backend/src/services/googleServices.ts`**.
+
+#### 1. Vertex AI — Gemini 2.0 Flash
+**File:** `backend/src/services/googleServices.ts`  
+**Model:** `gemini-2.0-flash-001` · **Location:** `asia-south1`  
+**Auth:** Application Default Credentials (ADC) — no API keys in code
+
+Three active Vertex AI functions:
+- `generatePredictions()` — Analyses all live zone occupancy values and returns 3 structured, actionable staff predictions. Called on load, every 60s, and on every phase change.
+- `generateZoneIntelligence()` — Deep-dives any specific zone: trend analysis, peak timing, redirect recommendation. Triggered when operations staff click a zone on the live heatmap.
+- `generatePAnnouncement()` — Writes a natural-language PA announcement for congested zones.
+
+**Active AI endpoints:**
+| Endpoint | AI Function |
+|----------|-------------|
+| `POST /api/ai/predict` | `generatePredictions()` via Vertex AI |
+| `POST /api/ai/zone-intel` | `generateZoneIntelligence()` via Vertex AI |
+| `POST /api/ai/announce` | `generatePAnnouncement()` via Vertex AI |
+| `GET /api/ai/chat/stream` | FlowBot fan chatbot (SSE streaming) |
+| `POST /api/ai/recommend` | Full venue FlowAgent recommendations |
+
+#### 2. Google OAuth 2.0
+**Library:** `passport-google-oauth20`  
+One-click "Continue with Google" sign-in. The user's Google profile photo, display name, and email are used throughout the UI — avatar, dropdown, welcome toast, and export reports.
+
+#### 3. Google Cloud Logging
+**File:** `backend/src/services/googleServices.ts`  
+**Log streams:** `venueflow-operations` · `venueflow-predictions`  
+Every Vertex AI call is logged with latency, model metadata, zone counts, and severity levels. Errors are tracked automatically.
+
+#### 4. Google Cloud Run
+**Region:** `asia-south1` (Mumbai — closest to the IPL venue use case)  
+**URL:** `https://venue-flow-ai-559905175681.asia-south1.run.app`  
+`GET /api/health` exposes live Google Services status: `{ vertexAI, auth, logging, cloudRun, model, project, location }`
+
+#### 5. Google Cloud Build + Artifact Registry
+CI/CD pipeline via `gcloud run deploy --source`. Docker images stored in Artifact Registry.
+
+#### Live Services Status Bar
+A fixed footer in the UI polls `/api/health` every 30 seconds and shows real-time green/red health indicators:
+```
+● Vertex AI  ● Google Auth  ● Cloud Logging  ● Cloud Run   gemini-2.0-flash-001 · asia-south1
+```
 
 ---
 
@@ -268,7 +305,11 @@ venueflow-ai/
 ├── backend/                     # Express TypeScript API
 │   └── src/
 │       ├── routes/              # auth, ai, events, zones, simulation, emergency…
-│       ├── services/            # gemini.ts (Vertex AI), SimulationEngine, AlertBot
+│       ├── services/
+│       │   ├── googleServices.ts  # ★ ALL Google Cloud integrations (Vertex AI + Cloud Logging)
+│       │   ├── gemini.ts          # FlowBot SSE streaming + legacy FlowAgent
+│       │   ├── SimulationEngine.ts# Real-time venue digital twin
+│       │   └── AlertBot.ts        # Automated alert generation
 │       ├── middleware/          # JWT auth, role guards
 │       ├── lib/                 # Prisma client, Redis client
 │       └── config/              # Mock data, venue map SVG config
