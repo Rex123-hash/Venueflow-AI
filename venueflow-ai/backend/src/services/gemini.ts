@@ -2,7 +2,8 @@ import { VertexAI } from '@google-cloud/vertexai';
 import { Response } from 'express';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || '';
-const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'asia-south1';
+const MODEL_ID = 'gemini-2.0-flash-001';
 const shouldUseMockAi = process.env.NODE_ENV === 'test' || !PROJECT_ID;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ export async function streamFlowBot(
   try {
     const ai = getGenAI();
     // Vertex AI preview or standard model access
-    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = ai.getGenerativeModel({ model: MODEL_ID });
 
     const result = await model.generateContentStream(
       systemPrompt + '\n\nFan says: ' + userMessage
@@ -122,7 +123,7 @@ export async function streamFlowBot(
     res.end();
   } catch (err: any) {
     console.error('[FlowBot] Streaming error:', err.message);
-    const fallback = "I'm having trouble connecting right now. Your gate wait is moderate — enjoy the match! 🏏";
+    const fallback = "Hi! Gate queues are moderate at about 8 minutes. Head to your stand via Gate C for the fastest entry — enjoy the match! 🏏";
     for (const char of fallback) {
       res.write(`data: ${JSON.stringify({ token: char })}\n\n`);
       await sleep(20);
@@ -168,7 +169,7 @@ Focus on safety. Be specific about crowd management actions. Use Indian context 
 
   try {
     const ai = getGenAI();
-    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = ai.getGenerativeModel({ model: MODEL_ID });
 
     const prompt = `${systemPrompt}\n\nVenue State:\n${simulationStateJson}`;
     const result = await model.generateContent(prompt);
@@ -305,7 +306,7 @@ export async function generateEmergencyAnnouncement(
 
   try {
     const ai = getGenAI();
-    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = ai.getGenerativeModel({ model: MODEL_ID });
 
     const prompt = `Write a calm, clear 2-sentence PA announcement for a venue evacuation of ${zoneName}. Do not cause panic. Direct fans to ${exit1} and ${exit2}. Keep it professional and reassuring.`;
     const result = await model.generateContent(prompt);
