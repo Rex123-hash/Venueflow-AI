@@ -235,7 +235,7 @@ BACKEND_URL=http://localhost:3001
 
 # Google Cloud Vertex AI (uses Application Default Credentials)
 GOOGLE_CLOUD_PROJECT_ID=venue-flow-ai-493017
-GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_CLOUD_LOCATION=asia-south1
 
 # Optional — app works with mock data without these
 # DATABASE_URL=postgresql://user:pass@localhost:5432/venueflow
@@ -271,7 +271,7 @@ gcloud run deploy venue-flow-ai \
 # 3. Set production environment variables
 gcloud run services update venue-flow-ai \
   --region asia-south1 \
-  --set-env-vars "GOOGLE_CLIENT_ID=...,GOOGLE_CLIENT_SECRET=...,JWT_SECRET=...,FRONTEND_URL=https://your-url.run.app,BACKEND_URL=https://your-url.run.app,GOOGLE_CLOUD_PROJECT_ID=venue-flow-ai-493017,GOOGLE_CLOUD_LOCATION=us-central1"
+  --set-env-vars "GOOGLE_CLIENT_ID=...,GOOGLE_CLIENT_SECRET=...,JWT_SECRET=...,FRONTEND_URL=https://your-url.run.app,BACKEND_URL=https://your-url.run.app,GOOGLE_CLOUD_PROJECT_ID=venue-flow-ai-493017,GOOGLE_CLOUD_LOCATION=asia-south1"
 ```
 
 ---
