@@ -182,6 +182,7 @@ const GoogleServicesBar: React.FC = () => {
     logging:       null as boolean | null,
     cloudRun:      true,
     cloudStorage:  null as boolean | null,
+    firebase:      null as boolean | null,
   });
 
   useEffect(() => {
@@ -195,6 +196,7 @@ const GoogleServicesBar: React.FC = () => {
           logging:      !!data.logging,
           cloudRun:     true,
           cloudStorage: !!data.cloudStorage,
+          firebase:     !!data.firebase,
         });
       } catch {
         setServices(s => ({ ...s, vertexAI: false, auth: false }));
@@ -236,6 +238,7 @@ const GoogleServicesBar: React.FC = () => {
       <span style={label}><span style={dot(services.logging)} /> Cloud Logging</span>
       <span style={label}><span style={dot(services.cloudRun)} /> Cloud Run</span>
       <span style={label}><span style={dot(services.cloudStorage)} /> Cloud Storage</span>
+      <span style={label}><span style={dot(services.firebase)} /> Firebase</span>
       <span style={{ marginLeft: 'auto', fontSize: 8, color: '#1e3a5f' }}>gemini-2.0-flash-001 · asia-south1</span>
     </div>
   );

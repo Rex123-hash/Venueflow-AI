@@ -86,6 +86,11 @@ app.get('/health', (_, res) => {
         bucket: GCS_BUCKET,
         usage: ['operations-reports', 'pa-announcement-logs'],
       },
+      firebase: {
+        enabled: true,
+        service: 'Firestore',
+        collections: ['venueflow-predictions', 'venueflow-announcements', 'venueflow-chatbot-sessions'],
+      },
     },
   });
 });
@@ -99,6 +104,7 @@ app.get('/api/health', (_, res) => {
     logging: true,
     cloudRun: true,
     cloudStorage: true,
+    firebase: true,
     gcsBucket: GCS_BUCKET,
     model: MODEL_ID,
     project: PROJECT_ID,

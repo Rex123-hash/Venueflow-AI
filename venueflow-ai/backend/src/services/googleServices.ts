@@ -8,11 +8,13 @@
  *   3. Google Cloud Logging           — Operational telemetry & prediction logging
  *   4. Google Cloud Run               — Serverless container hosting (asia-south1)
  *   5. Google Cloud Storage           — Operations report archival & PA announcement logs
+ *   6. Firebase Admin + Firestore     — Real-time AI prediction store, fan activity, announcements
  */
 
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { Logging } from '@google-cloud/logging';
 import { Storage } from '@google-cloud/storage';
+import * as admin from 'firebase-admin';
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 export const GCS_BUCKET = `${process.env.GOOGLE_CLOUD_PROJECT_ID || 'venue-flow-ai-493017'}-venueflow-reports`;
@@ -25,6 +27,104 @@ export const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'asia-south1';
 export const MODEL_ID = 'gemini-2.0-flash-001';
 
 const shouldUseMockAI = process.env.NODE_ENV === 'test' || !PROJECT_ID;
+
+// ─── Firebase Admin + Firestore Setup ───────────────────────────────────────────
+let _firebaseApp: admin.app.App | null = null;
+
+function getFirestore(): admin.firestore.Firestore {
+  if (!_firebaseApp) {
+    _firebaseApp = admin.apps.length
+      ? admin.apps[0]!
+      : admin.initializeApp({
+          credential: admin.credential.applicationDefault(),
+          projectId: PROJECT_ID,
+        });
+  }
+  return admin.firestore(_firebaseApp!);
+}
+
+/**
+ * Stores AI predictions in Firestore (venueflow-predictions collection).
+ * Called after every generatePredictions() Vertex AI call.
+ */
+export async function storePredictionsInFirestore(
+  predictions: FlowAgentPrediction[],
+  phase: string,
+  totalFans: number
+): Promise<void> {
+  try {
+    const db = getFirestore();
+    const batch = db.batch();
+    const sessionRef = db
+      .collection('venueflow-predictions')
+      .doc(new Date().toISOString().split('T')[0])  // Daily doc
+      .collection('sessions')
+      .doc(Date.now().toString());
+
+    batch.set(sessionRef, {
+      predictions,
+      phase,
+      totalFans,
+      model: MODEL_ID,
+      location: LOCATION,
+      projectId: PROJECT_ID,
+      generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      service: 'venueflow-ai',
+    });
+    await batch.commit();
+    console.log('[Firebase] Predictions stored in Firestore');
+  } catch (err: any) {
+    console.error('[Firebase] Firestore write failed (non-critical):', err.message);
+  }
+}
+
+/**
+ * Stores a PA announcement in Firestore (venueflow-announcements collection).
+ * Called after every generatePAnnouncement() call.
+ */
+export async function storeAnnouncementInFirestore(
+  zoneName: string,
+  announcement: string
+): Promise<void> {
+  try {
+    const db = getFirestore();
+    await db.collection('venueflow-announcements').add({
+      zoneName,
+      announcement,
+      model: MODEL_ID,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      source: 'vertex-ai-gemini',
+    });
+    console.log('[Firebase] Announcement stored in Firestore:', zoneName);
+  } catch (err: any) {
+    console.error('[Firebase] Announcement write failed (non-critical):', err.message);
+  }
+}
+
+/**
+ * Logs a FlowBot fan interaction to Firestore.
+ * Stores anonymised chat sessions for analytics.
+ */
+export async function logFlowBotInteraction(
+  fanId: string | undefined,
+  messagePreview: string,
+  responseLength: number
+): Promise<void> {
+  try {
+    const db = getFirestore();
+    await db.collection('venueflow-chatbot-sessions').add({
+      fanId: fanId || 'anonymous',
+      messagePreview: messagePreview.substring(0, 50),
+      responseLength,
+      model: MODEL_ID,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      event: 'IPL 2025 MI vs CSK',
+      venue: 'DY Patil Stadium',
+    });
+  } catch {
+    // Silent failure — non-critical analytics
+  }
+}
 
 // ─── Vertex AI Setup ─────────────────────────────────────────────────────────
 let _vertexAI: VertexAI | null = null;

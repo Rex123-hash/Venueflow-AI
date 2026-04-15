@@ -6,6 +6,9 @@ import {
   logOperationalEvent,
   logPredictionEvent,
   getFallbackPredictions,
+  storePredictionsInFirestore,
+  storeAnnouncementInFirestore,
+  logFlowBotInteraction,
   PredictZone,
   PROJECT_ID,
   MODEL_ID,
@@ -91,6 +94,8 @@ router.get('/chat/stream', async (req: Request, res: Response): Promise<void> =>
   } catch { /* engine not started, use defaults */ }
 
   const systemPrompt = buildFlowBotSystemPrompt(fanContext);
+  // Log FlowBot interaction to Firebase Firestore (async, non-blocking)
+  logFlowBotInteraction(fan_id, message, message.length).catch(() => {});
   await streamFlowBot(message, systemPrompt, res);
 });
 
@@ -183,7 +188,7 @@ router.post('/predict', async (req: Request, res: Response): Promise<void> => {
 
     const latencyMs = Date.now() - startTime;
 
-    // Log to Google Cloud Logging (async, non-blocking)
+    // Log to Google Cloud Logging + Firebase Firestore (async, non-blocking)
     await Promise.all([
       logPredictionEvent(predictions, latencyMs),
       logOperationalEvent('prediction_generated', {
@@ -193,6 +198,7 @@ router.post('/predict', async (req: Request, res: Response): Promise<void> => {
         model: MODEL_ID,
         severity: 'INFO',
       }),
+      storePredictionsInFirestore(predictions, phase || 'MATCH_LIVE', totalFans || 0),
     ]);
 
     res.json({ success: true, predictions, latencyMs });
