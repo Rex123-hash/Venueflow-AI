@@ -13,7 +13,7 @@ import { initSocketServer } from './socket/index';
 import { getSimulationEngine } from './services/SimulationEngine';
 import { getAlertBot } from './services/AlertBot';
 import { attachSocketToEmergency } from './routes/emergency';
-import { PROJECT_ID, MODEL_ID, LOCATION } from './services/googleServices';
+import { PROJECT_ID, MODEL_ID, LOCATION, GCS_BUCKET } from './services/googleServices';
 
 import authRoutes from './routes/auth';
 import eventRoutes from './routes/events';
@@ -81,6 +81,11 @@ app.get('/health', (_, res) => {
         region: LOCATION,
         url: process.env.BACKEND_URL || 'http://localhost:3001',
       },
+      cloudStorage: {
+        enabled: true,
+        bucket: GCS_BUCKET,
+        usage: ['operations-reports', 'pa-announcement-logs'],
+      },
     },
   });
 });
@@ -93,6 +98,8 @@ app.get('/api/health', (_, res) => {
     auth: true,
     logging: true,
     cloudRun: true,
+    cloudStorage: true,
+    gcsBucket: GCS_BUCKET,
     model: MODEL_ID,
     project: PROJECT_ID,
     location: LOCATION,

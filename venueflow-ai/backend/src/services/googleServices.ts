@@ -7,12 +7,15 @@
  *   2. Google OAuth 2.0               — User authentication (via passport-google-oauth20)
  *   3. Google Cloud Logging           — Operational telemetry & prediction logging
  *   4. Google Cloud Run               — Serverless container hosting (asia-south1)
+ *   5. Google Cloud Storage           — Operations report archival & PA announcement logs
  */
 
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { Logging } from '@google-cloud/logging';
+import { Storage } from '@google-cloud/storage';
 
 // ─── Configuration ────────────────────────────────────────────────────────────
+export const GCS_BUCKET = `${process.env.GOOGLE_CLOUD_PROJECT_ID || 'venue-flow-ai-493017'}-venueflow-reports`;
 export const PROJECT_ID =
   process.env.GOOGLE_CLOUD_PROJECT_ID ||
   process.env.GOOGLE_CLOUD_PROJECT ||
@@ -376,5 +379,72 @@ export async function logPredictionEvent(
     await log.write(entry);
   } catch {
     // Cloud Logging is optional — silent failure
+  }
+}
+// ─── 6. Google Cloud Storage — Report Archival ───────────────────────────────
+/**
+ * Uploads an operations report to Google Cloud Storage.
+ * Bucket: venue-flow-ai-493017-venueflow-reports
+ * Used by: /api/admin/export-report endpoint
+ */
+let _storage: Storage | null = null;
+
+function getStorage(): Storage {
+  if (!_storage) {
+    _storage = new Storage({ projectId: PROJECT_ID });
+  }
+  return _storage;
+}
+
+export async function uploadReportToGCS(
+  reportContent: string,
+  filename: string
+): Promise<string> {
+  try {
+    const storage = getStorage();
+    const bucket = storage.bucket(GCS_BUCKET);
+
+    // Ensure bucket exists (create if not)
+    const [exists] = await bucket.exists();
+    if (!exists) {
+      await bucket.create({ location: LOCATION });
+    }
+
+    const file = bucket.file(`reports/${filename}`);
+    await file.save(reportContent, {
+      contentType: 'text/plain',
+      metadata: {
+        cacheControl: 'no-cache',
+        source: 'venueflow-ai',
+        model: MODEL_ID,
+        generatedAt: new Date().toISOString(),
+      },
+    });
+
+    const gcsUri = `gs://${GCS_BUCKET}/reports/${filename}`;
+    console.log(`[GoogleStorage] Report uploaded: ${gcsUri}`);
+    return gcsUri;
+  } catch (err: any) {
+    console.error('[GoogleStorage] Upload failed (non-critical):', err.message);
+    return '';  // Non-critical — report is still served locally
+  }
+}
+
+export async function uploadPAAnnouncementLog(
+  zoneName: string,
+  announcement: string,
+  timestamp: string
+): Promise<void> {
+  try {
+    const storage = getStorage();
+    const bucket = storage.bucket(GCS_BUCKET);
+    const [exists] = await bucket.exists();
+    if (!exists) await bucket.create({ location: LOCATION });
+
+    const logEntry = JSON.stringify({ zoneName, announcement, timestamp, model: MODEL_ID });
+    const file = bucket.file(`pa-logs/${timestamp.replace(/:/g, '-')}.json`);
+    await file.save(logEntry, { contentType: 'application/json' });
+  } catch {
+    // Silent failure — PA logs are supplementary
   }
 }

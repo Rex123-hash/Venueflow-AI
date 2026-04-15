@@ -177,10 +177,11 @@ const App: React.FC = () => {
 // ─── Google Services Status Bar ────────────────────────────────────────────────────
 const GoogleServicesBar: React.FC = () => {
   const [services, setServices] = useState({
-    vertexAI: null as boolean | null,
-    auth:     null as boolean | null,
-    logging:  null as boolean | null,
-    cloudRun: true,
+    vertexAI:      null as boolean | null,
+    auth:          null as boolean | null,
+    logging:       null as boolean | null,
+    cloudRun:      true,
+    cloudStorage:  null as boolean | null,
   });
 
   useEffect(() => {
@@ -189,10 +190,11 @@ const GoogleServicesBar: React.FC = () => {
         const res = await fetch('/api/health');
         const data = await res.json();
         setServices({
-          vertexAI: !!data.vertexAI,
-          auth:     !!data.auth,
-          logging:  !!data.logging,
-          cloudRun: true,
+          vertexAI:     !!data.vertexAI,
+          auth:         !!data.auth,
+          logging:      !!data.logging,
+          cloudRun:     true,
+          cloudStorage: !!data.cloudStorage,
         });
       } catch {
         setServices(s => ({ ...s, vertexAI: false, auth: false }));
@@ -233,6 +235,7 @@ const GoogleServicesBar: React.FC = () => {
       <span style={label}><span style={dot(services.auth)} /> Google Auth</span>
       <span style={label}><span style={dot(services.logging)} /> Cloud Logging</span>
       <span style={label}><span style={dot(services.cloudRun)} /> Cloud Run</span>
+      <span style={label}><span style={dot(services.cloudStorage)} /> Cloud Storage</span>
       <span style={{ marginLeft: 'auto', fontSize: 8, color: '#1e3a5f' }}>gemini-2.0-flash-001 · asia-south1</span>
     </div>
   );

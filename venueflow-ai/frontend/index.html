@@ -15,6 +15,22 @@
   <meta property="og:description" content="Your Smart Companion for Every Event" />
   <meta property="og:type" content="website" />
 
+  <!-- Google Analytics 4 (GA4) — VenueFlow AI event tracking -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-VENUEFLOW01"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-VENUEFLOW01', {
+      page_title: 'VenueFlow AI',
+      custom_map: { dimension1: 'user_role', dimension2: 'venue_zone' }
+    });
+    // Track AI interactions
+    window.trackAIEvent = function(eventName, params) {
+      gtag('event', eventName, { event_category: 'AI', ...params });
+    };
+  </script>
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
