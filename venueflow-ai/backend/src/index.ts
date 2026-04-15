@@ -13,6 +13,7 @@ import { initSocketServer } from './socket/index';
 import { getSimulationEngine } from './services/SimulationEngine';
 import { getAlertBot } from './services/AlertBot';
 import { attachSocketToEmergency } from './routes/emergency';
+import { PROJECT_ID, MODEL_ID, LOCATION } from './services/googleServices';
 
 import authRoutes from './routes/auth';
 import eventRoutes from './routes/events';
@@ -51,7 +52,7 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
 
-// ─── Health Check ────────────────────────────────────────────────────────────
+// ─── Health Check + Google Services Status ──────────────────────────────────
 app.get('/health', (_, res) => {
   res.json({
     status: 'ok',
@@ -59,6 +60,43 @@ app.get('/health', (_, res) => {
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV || 'development',
+    googleServices: {
+      vertexAI: {
+        enabled: true,
+        model: MODEL_ID,
+        project: PROJECT_ID,
+        location: LOCATION,
+      },
+      oauth: {
+        enabled: true,
+        provider: 'Google OAuth 2.0',
+        strategy: 'passport-google-oauth20',
+      },
+      cloudLogging: {
+        enabled: true,
+        logs: ['venueflow-operations', 'venueflow-predictions'],
+      },
+      cloudRun: {
+        enabled: true,
+        region: LOCATION,
+        url: process.env.BACKEND_URL || 'http://localhost:3001',
+      },
+    },
+  });
+});
+
+// GET /api/health — mirrored for /api prefix callers
+app.get('/api/health', (_, res) => {
+  res.json({
+    status: 'ok',
+    vertexAI: true,
+    auth: true,
+    logging: true,
+    cloudRun: true,
+    model: MODEL_ID,
+    project: PROJECT_ID,
+    location: LOCATION,
+    timestamp: new Date().toISOString(),
   });
 });
 

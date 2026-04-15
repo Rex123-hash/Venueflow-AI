@@ -1,10 +1,21 @@
 import { Router, Request, Response } from 'express';
-import { streamFlowBot, buildFlowBotSystemPrompt, runFlowAgent, runFlowAgentPredict, getFallbackPredictions, PredictZoneInput } from '../services/gemini';
+import {
+  generatePredictions,
+  generateZoneIntelligence,
+  generatePAnnouncement,
+  logOperationalEvent,
+  logPredictionEvent,
+  getFallbackPredictions,
+  PredictZone,
+  PROJECT_ID,
+  MODEL_ID,
+  LOCATION,
+} from '../services/googleServices';
+import { streamFlowBot, buildFlowBotSystemPrompt, runFlowAgent } from '../services/gemini';
 import { redisGet } from '../lib/redis';
 import { prisma } from '../lib/prisma';
 import { getSimulationEngine } from '../services/SimulationEngine';
-import { MOCK_TICKET, SEED_EVENT_ID } from '../config/mockData';
-import { MOCK_ALERTS } from '../config/mockData';
+import { MOCK_TICKET, SEED_EVENT_ID, MOCK_ALERTS } from '../config/mockData';
 
 const router = Router();
 
@@ -140,40 +151,115 @@ router.post('/predict-queue', async (req: Request, res: Response): Promise<void>
   res.json(prediction);
 });
 
-// POST /api/ai/predict — FlowAgent structured predictions from live zone data
+// POST /api/ai/predict — FlowAgent structured predictions via Vertex AI Gemini 2.0 Flash
 router.post('/predict', async (req: Request, res: Response): Promise<void> => {
   const { zones, phase, totalFans, capacity } = req.body;
 
-  if (!zones || !Array.isArray(zones)) {
+  if (!zones || !Array.isArray(zones) || zones.length === 0) {
     res.status(400).json({ success: false, error: 'zones array required' });
     return;
   }
 
   // Enrich zones with live simulation data if available
-  let enrichedZones: PredictZoneInput[] = zones;
+  let enrichedZones: PredictZone[] = zones;
   try {
     const engine = getSimulationEngine();
     const state = engine.getState();
-    enrichedZones = zones.map((z: PredictZoneInput) => {
+    enrichedZones = zones.map((z: PredictZone) => {
       const live = state.zones.find((lz: any) => lz.name === z.name || lz.id === z.id);
-      if (live) {
-        return { ...z, occ: live.count ?? z.occ };
-      }
-      return z;
+      return live ? { ...z, occ: live.count ?? z.occ } : z;
     });
-  } catch { /* use client-provided zone data */ }
+  } catch { /* use client-provided data */ }
+
+  const startTime = Date.now();
 
   try {
-    const predictions = await runFlowAgentPredict(
+    const predictions = await generatePredictions(
       enrichedZones,
       phase || 'MATCH_LIVE',
-      totalFans || enrichedZones.reduce((s: number, z: PredictZoneInput) => s + z.occ, 0),
+      totalFans || enrichedZones.reduce((s, z) => s + z.occ, 0),
       capacity || 42000
     );
-    res.json({ success: true, predictions });
+
+    const latencyMs = Date.now() - startTime;
+
+    // Log to Google Cloud Logging (async, non-blocking)
+    await Promise.all([
+      logPredictionEvent(predictions, latencyMs),
+      logOperationalEvent('prediction_generated', {
+        phaseContext: phase,
+        zoneCount: enrichedZones.length,
+        latencyMs,
+        model: MODEL_ID,
+        severity: 'INFO',
+      }),
+    ]);
+
+    res.json({ success: true, predictions, latencyMs });
   } catch (err: any) {
     console.error('[/api/ai/predict] Error:', err.message);
-    res.json({ success: false, predictions: getFallbackPredictions(enrichedZones) });
+    await logOperationalEvent('prediction_error', {
+      error: err.message,
+      severity: 'ERROR',
+    });
+    res.json({
+      success: false,
+      predictions: getFallbackPredictions(enrichedZones),
+    });
+  }
+});
+
+// POST /api/ai/zone-intel — Deep zone analysis via Vertex AI
+router.post('/zone-intel', async (req: Request, res: Response): Promise<void> => {
+  const { zone, allZones, phase } = req.body;
+
+  if (!zone) {
+    res.status(400).json({ success: false, error: 'zone required' });
+    return;
+  }
+
+  try {
+    const intel = await generateZoneIntelligence(
+      zone,
+      allZones || [],
+      phase || 'MATCH_LIVE'
+    );
+
+    await logOperationalEvent('zone_intel_requested', {
+      zoneName: zone.name,
+      zoneOccupancy: Math.round((zone.occ / zone.cap) * 100),
+      severity: 'INFO',
+    });
+
+    res.json({ success: true, intel });
+  } catch (err: any) {
+    console.error('[/api/ai/zone-intel] Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/ai/announce — AI-generated PA announcement via Vertex AI
+router.post('/announce', async (req: Request, res: Response): Promise<void> => {
+  const { zone, altZone } = req.body;
+
+  if (!zone || !altZone) {
+    res.status(400).json({ success: false, error: 'zone and altZone required' });
+    return;
+  }
+
+  try {
+    const announcement = await generatePAnnouncement(zone, altZone);
+
+    await logOperationalEvent('pa_announcement_generated', {
+      targetZone: zone.name,
+      altZone: altZone.name,
+      severity: 'INFO',
+    });
+
+    res.json({ success: true, announcement });
+  } catch (err: any) {
+    console.error('[/api/ai/announce] Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

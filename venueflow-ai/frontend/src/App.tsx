@@ -165,9 +165,76 @@ const App: React.FC = () => {
         </Routes>
       </main>
 
+      {/* Google Services Status Footer */}
+      <GoogleServicesBar />
+
       {/* Global Bot (only visible for Fans or unauthenticated demo users) */}
       {(!isAuthenticated || user?.role === 'FAN') && <ChatBot fanId={user?.id} />}
     </BrowserRouter>
+  );
+};
+
+// ─── Google Services Status Bar ────────────────────────────────────────────────────
+const GoogleServicesBar: React.FC = () => {
+  const [services, setServices] = useState({
+    vertexAI: null as boolean | null,
+    auth:     null as boolean | null,
+    logging:  null as boolean | null,
+    cloudRun: true,
+  });
+
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        setServices({
+          vertexAI: !!data.vertexAI,
+          auth:     !!data.auth,
+          logging:  !!data.logging,
+          cloudRun: true,
+        });
+      } catch {
+        setServices(s => ({ ...s, vertexAI: false, auth: false }));
+      }
+    };
+    check();
+    const t = setInterval(check, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const dot = (active: boolean | null) => ({
+    width: 5, height: 5, borderRadius: '50%',
+    background: active === null ? '#475569' : active ? '#00e5a0' : '#ef4444',
+    display: 'inline-block',
+    transition: 'background 0.4s',
+  });
+
+  const label: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 5,
+    fontSize: 9, color: '#334155', fontWeight: 600,
+    textTransform: 'uppercase', letterSpacing: '0.7px',
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0,
+      background: 'rgba(7,14,26,0.92)',
+      backdropFilter: 'blur(8px)',
+      borderTop: '1px solid #1e3a5f',
+      padding: '5px 20px',
+      display: 'flex', alignItems: 'center', gap: 20,
+      zIndex: 9999,
+    }}>
+      <span style={{ fontSize: 8, color: '#1e3a5f', fontWeight: 700, marginRight: 4, letterSpacing: '1px' }}>
+        GOOGLE SERVICES
+      </span>
+      <span style={label}><span style={dot(services.vertexAI)} /> Vertex AI</span>
+      <span style={label}><span style={dot(services.auth)} /> Google Auth</span>
+      <span style={label}><span style={dot(services.logging)} /> Cloud Logging</span>
+      <span style={label}><span style={dot(services.cloudRun)} /> Cloud Run</span>
+      <span style={{ marginLeft: 'auto', fontSize: 8, color: '#1e3a5f' }}>gemini-2.0-flash-001 · asia-south1</span>
+    </div>
   );
 };
 

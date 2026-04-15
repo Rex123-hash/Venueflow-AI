@@ -15,6 +15,7 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
+    "@google-cloud/logging": "^11.2.1",
     "@google-cloud/vertexai": "^1.11.0",
     "@google/generative-ai": "^0.21.0",
     "@prisma/client": "^5.22.0",
