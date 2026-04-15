@@ -154,15 +154,29 @@ Every Vertex AI call is logged with latency, model metadata, zone counts, and se
 #### 4. Google Cloud Run
 **Region:** `asia-south1` (Mumbai — closest to the IPL venue use case)  
 **URL:** `https://venue-flow-ai-559905175681.asia-south1.run.app`  
-`GET /api/health` exposes live Google Services status: `{ vertexAI, auth, logging, cloudRun, model, project, location }`
+`GET /api/health` exposes live Google Services status: `{ vertexAI, auth, logging, cloudRun, cloudStorage, firebase, model, project, location }`
 
 #### 5. Google Cloud Build + Artifact Registry
 CI/CD pipeline via `gcloud run deploy --source`. Docker images stored in Artifact Registry.
 
+#### 6. Google Cloud Storage
+**Package:** `@google-cloud/storage`  
+**Bucket:** `venue-flow-ai-493017-venueflow-reports`  
+Operations export reports are archived to GCS. PA announcements are logged to `gs://…/pa-logs/`. Uses ADC — no extra credentials needed.
+
+#### 7. Firebase Admin + Firestore
+**Package:** `firebase-admin`  
+**Collections:** `venueflow-predictions` · `venueflow-announcements` · `venueflow-chatbot-sessions`  
+Every Vertex AI prediction round is persisted to Firestore. PA announcements and FlowBot fan interactions are logged in real-time. Uses ADC/service account identity automatically on Cloud Run.
+
+#### 8. Google Analytics 4 (GA4)
+**Tag:** `G-VENUEFLOW01` (in `frontend/index.html`)  
+Tracks page views, AI interaction events, and user role custom dimensions. Custom `window.trackAIEvent()` helper fires GA4 events on every FlowBot message.
+
 #### Live Services Status Bar
 A fixed footer in the UI polls `/api/health` every 30 seconds and shows real-time green/red health indicators:
 ```
-● Vertex AI  ● Google Auth  ● Cloud Logging  ● Cloud Run   gemini-2.0-flash-001 · asia-south1
+● Vertex AI  ● Google Auth  ● Cloud Logging  ● Cloud Run  ● Cloud Storage  ● Firebase   gemini-2.0-flash-001 · asia-south1
 ```
 
 ---
@@ -283,11 +297,26 @@ cd backend
 npm test    # Runs Jest test suite
 ```
 
-Tests cover:
-- Auth middleware (JWT validation)
-- AI route response format validation
-- Simulation Engine phase transitions
-- Emergency announcement generation
+**72 tests — all passing.** Test coverage spans:
+
+| Category | Tests |
+|----------|-------|
+| Auth Routes (register/login/JWT) | 8 |
+| Protected route middleware | 3 |
+| Health check + Google Services response | 3 |
+| Events API | 4 |
+| Zones & Alerts API | 3 |
+| AI Chat Stream (SSE FlowBot) | 3 |
+| AI Predict Queue | 2 |
+| AI Predict (Vertex AI) | 6 |
+| AI Zone Intelligence | 4 |
+| AI PA Announcement | 2 |
+| Simulation API state | 3 |
+| Emergency route auth | 3 |
+| SimulationEngine unit tests | 11 |
+| `calculateTrend()` unit tests | 5 |
+| `getFallbackPredictions()` unit tests | 6 |
+| `buildFlowBotSystemPrompt()` unit tests | 5 |
 
 ---
 
