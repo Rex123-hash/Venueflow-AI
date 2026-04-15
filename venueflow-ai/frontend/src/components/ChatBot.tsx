@@ -63,11 +63,10 @@ const ChatBot: React.FC<ChatBotProps> = ({ fanId, className = '' }) => {
 
     try {
       const API_URL = getApiBaseUrl();
-      const url = new URL(`${API_URL}/ai/chat/stream`);
-      url.searchParams.append('message', userText);
-      if (fanId) url.searchParams.append('fan_id', fanId);
+      const params = new URLSearchParams({ message: userText });
+      if (fanId) params.append('fan_id', fanId);
 
-      const response = await fetch(url.toString(), {
+      const response = await fetch(`${API_URL}/ai/chat/stream?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('venueflow-token')}`
         }

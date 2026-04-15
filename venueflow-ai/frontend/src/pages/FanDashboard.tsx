@@ -67,11 +67,10 @@ const FanDashboard: React.FC = () => {
 
         try {
             const API_URL = getApiBaseUrl();
-            const url = new URL(`${API_URL}/ai/chat/stream`);
-            url.searchParams.append('message', text);
-            if (user?.id) url.searchParams.append('fan_id', user.id);
+            const params = new URLSearchParams({ message: text });
+            if (user?.id) params.append('fan_id', user.id);
 
-            const response = await fetch(url.toString(), {
+            const response = await fetch(`${API_URL}/ai/chat/stream?${params.toString()}`, {
                headers: { 'Authorization': `Bearer ${getStoredToken()}` }
             });
 
